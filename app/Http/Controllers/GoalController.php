@@ -32,7 +32,10 @@ class GoalController extends Controller
     {
         if ($goal->user_id !== Auth::id()) abort(403);
 
-        // Lógica para adicionar valor à meta
+        $request->validate([
+            'amount' => 'required|numeric|min:0.01'
+        ]);
+
         $goal->increment('current_amount', $request->amount);
 
         if ($goal->current_amount >= $goal->target_amount) {

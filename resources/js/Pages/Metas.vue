@@ -1,100 +1,99 @@
-<script setup>
-import { ref, reactive, computed } from 'vue';
-import { Head } from '@inertiajs/vue3';
+<script>
+import { Head, useForm, router } from '@inertiajs/vue3';
 import MainLayout from '@/Layouts/MainLayout.vue';
 
-defineProps({
-    auth: Object
-});
+export default {
+    components: {
+        Head,
+        MainLayout
+    },
+    props: {
+        auth: Object,
+        dbMetas: Array,
+        dbContas: Array
+    },
+    data() {
+        return {
+            activeTab: 'em_andamento',
+            showAddValueModal: null, // Guarda o ID da meta para abrir o modal
 
-// --- Estado ---
-const activeTab = ref('em_andamento');
+            // Formulário de Criação
+            formCreate: useForm({
+                name: '',
+                target_amount: '',
+                account_id: ''
+            }),
 
-// Dados iniciais (Mock)
-const metas = ref([
-    { id: '1', name: 'Playstation 5', valorAlvo: 4000, contaVinculada: 'Caixinha Nubank', valorAcumulado: 2500, status: 'em_andamento' },
-    { id: '2', name: 'Viagem para Europa', valorAlvo: 15000, contaVinculada: 'Poupança', valorAcumulado: 15000, status: 'concluida' },
-    { id: '3', name: 'Reserva de Emergência', valorAlvo: 10000, contaVinculada: 'Investimento X', valorAcumulado: 6800, status: 'em_andamento' },
-]);
-
-// Contas (Mock)
-const contas = ['Conta Corrente', 'Poupança', 'Carteira', 'Caixinha Nubank', 'Investimento X'];
-
-// Formulário Nova Meta
-const metaForm = reactive({ name: '', valorAlvo: '', contaVinculada: '' });
-
-// Modal Adicionar Valor
-const showAddValueModal = ref(null); // Guarda o ID da meta
-const valorAdicionar = ref('');
-const origemSelecionada = ref('');
-
-// --- Computados ---
-const metasEmAndamento = computed(() => metas.value.filter(m => m.status === 'em_andamento'));
-const metasConcluidas = computed(() => metas.value.filter(m => m.status === 'concluida'));
-
-const tabs = computed(() => [
-    { id: 'em_andamento', label: 'Em Andamento', count: metasEmAndamento.value.length },
-    { id: 'concluida', label: 'Concluídas', count: metasConcluidas.value.length },
-]);
-
-// --- Ações ---
-const handleAddMeta = () => {
-    if (!metaForm.name || !metaForm.valorAlvo || !metaForm.contaVinculada) {
-        return alert('Preencha todos os campos');
-    }
-
-    metas.value.push({
-        id: Date.now().toString(),
-        name: metaForm.name,
-        valorAlvo: parseFloat(metaForm.valorAlvo),
-        contaVinculada: metaForm.contaVinculada,
-        valorAcumulado: 0,
-        status: 'em_andamento'
-    });
-
-    // Reset form
-    metaForm.name = '';
-    metaForm.valorAlvo = '';
-    metaForm.contaVinculada = '';
-};
-
-const handleDeleteMeta = (id) => {
-    if (confirm('Deseja excluir esta meta?')) {
-        metas.value = metas.value.filter(m => m.id !== id);
-    }
-};
-
-const handleAddValue = (metaId) => {
-    if (!valorAdicionar.value || parseFloat(valorAdicionar.value) <= 0) return alert('Valor inválido');
-    if (!origemSelecionada.value) return alert('Selecione a origem');
-
-    const metaIndex = metas.value.findIndex(m => m.id === metaId);
-    if (metaIndex !== -1) {
-        const meta = metas.value[metaIndex];
-        const novoValor = meta.valorAcumulado + parseFloat(valorAdicionar.value);
-
-        metas.value[metaIndex] = {
-            ...meta,
-            valorAcumulado: novoValor,
-            status: novoValor >= meta.valorAlvo ? 'concluida' : 'em_andamento'
+            // Formulário de Adicionar Valor
+            formAddValue: useForm({
+                amount: ''
+            })
         };
+    },
+    computed: {
+        metasEmAndamento() {
+            return this.dbMetas.filter(m => m.status === 'em_andamento');
+        },
+        metasConcluidas() {
+            return this.dbMetas.filter(m => m.status === 'concluida');
+        },
+        tabs() {
+            return [
+                { id: 'em_andamento', label: 'Em Andamento', count: this.metasEmAndamento.length },
+                { id: 'concluida', label: 'Concluídas', count: this.metasConcluidas.length },
+            ];
+        }
+    },
+    methods: {
+        // --- Ações de CRUD ---
+        handleAddMeta() {
+            this.formCreate.post(route('goals.store'), {
+                onSuccess: () => this.formCreate.reset(),
+            });
+        },
+        handleDeleteMeta(id) {
+            if (confirm('Deseja realmente excluir esta meta?')) {
+                router.delete(route('goals.destroy', id));
+            }
+        },
+        handleAddValue() {
+            // Envia o valor para somar na meta
+            this.formAddValue.put(route('goals.update', this.showAddValueModal), {
+                onSuccess: () => {
+                    this.closeModal();
+                }
+            });
+        },
+
+        // --- Controle do Modal ---
+        openAddValueModal(metaId) {
+            this.showAddValueModal = metaId;
+            this.formAddValue.reset();
+        },
+        closeModal() {
+            this.showAddValueModal = null;
+            this.formAddValue.reset();
+        },
+
+        // --- Helpers de Formatação ---
+
+        // Calcula a porcentagem REAL (pode passar de 100%)
+        calcularProgressoReal(meta) {
+            const atual = parseFloat(meta.current_amount);
+            const alvo = parseFloat(meta.target_amount);
+            if (alvo <= 0) return 0;
+            return (atual / alvo) * 100, 100;
+        },
+
+        // Calcula a largura da barra (Trava em 100% para não quebrar o CSS)
+        calcularLarguraBarra(meta) {
+            return Math.min(this.calcularProgressoReal(meta), 100);
+        },
+
+        formatCurrency(value) {
+            return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(value || 0);
+        }
     }
-
-    closeModal();
-};
-
-const closeModal = () => {
-    showAddValueModal.value = null;
-    valorAdicionar.value = '';
-    origemSelecionada.value = '';
-};
-
-const calcularProgresso = (meta) => {
-    return Math.min((meta.valorAcumulado / meta.valorAlvo) * 100, 100);
-};
-
-const formatCurrency = (value) => {
-    return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(value);
 };
 </script>
 
@@ -119,25 +118,31 @@ const formatCurrency = (value) => {
                     <form @submit.prevent="handleAddMeta" class="space-y-4">
                         <div>
                             <label class="block text-sm font-medium text-gray-700 mb-1">Nome da Meta</label>
-                            <input v-model="metaForm.name" type="text" placeholder="Ex: Playstation 5" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500">
+                            <input v-model="formCreate.name" type="text" placeholder="Ex: Playstation 5" required class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500">
+                            <div v-if="formCreate.errors.name" class="text-red-500 text-xs mt-1">{{ formCreate.errors.name }}</div>
                         </div>
 
                         <div>
                             <label class="block text-sm font-medium text-gray-700 mb-1">Valor Alvo (R$)</label>
-                            <input v-model="metaForm.valorAlvo" type="number" step="0.01" placeholder="0,00" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500">
+                            <input v-model="formCreate.target_amount" type="number" step="0.01" placeholder="0,00" required class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500">
+                            <div v-if="formCreate.errors.target_amount" class="text-red-500 text-xs mt-1">{{ formCreate.errors.target_amount }}</div>
                         </div>
 
                         <div>
                             <label class="block text-sm font-medium text-gray-700 mb-1">Conta Vinculada</label>
-                            <select v-model="metaForm.contaVinculada" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500">
-                                <option value="">Selecione...</option>
-                                <option v-for="conta in contas" :key="conta" :value="conta">{{ conta }}</option>
+                            <select v-model="formCreate.account_id" required class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500 bg-white">
+                                <option value="" disabled>Selecione...</option>
+                                <option v-for="conta in dbContas" :key="conta.id" :value="conta.id">{{ conta.name }}</option>
                             </select>
+                            <div v-if="formCreate.errors.account_id" class="text-red-500 text-xs mt-1">{{ formCreate.errors.account_id }}</div>
                         </div>
 
-                        <button type="submit" class="w-full bg-blue-600 text-white py-2.5 rounded-lg font-medium hover:bg-blue-700 transition-colors flex items-center justify-center gap-2">
-                            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
-                            Criar Meta
+                        <button type="submit" :disabled="formCreate.processing" class="w-full bg-blue-600 text-white py-2.5 rounded-lg font-medium hover:bg-blue-700 transition-colors flex items-center justify-center gap-2">
+                            <span v-if="formCreate.processing">Criando...</span>
+                            <span v-else class="flex items-center gap-2">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+                                Criar Meta
+                            </span>
                         </button>
                     </form>
                 </div>
@@ -147,7 +152,7 @@ const formatCurrency = (value) => {
                     <div class="space-y-3">
                         <div class="flex justify-between items-center text-sm">
                             <span class="text-gray-600">Total de Metas</span>
-                            <span class="font-bold text-gray-900">{{ metas.length }}</span>
+                            <span class="font-bold text-gray-900">{{ dbMetas.length }}</span>
                         </div>
                         <div class="flex justify-between items-center text-sm">
                             <span class="text-gray-600">Em Andamento</span>
@@ -196,7 +201,7 @@ const formatCurrency = (value) => {
                                         <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" :class="meta.status === 'concluida' ? 'text-green-600' : 'text-blue-600'"><circle cx="12" cy="12" r="10"></circle><circle cx="12" cy="12" r="6"></circle><circle cx="12" cy="12" r="2"></circle></svg>
                                         {{ meta.name }}
                                     </h3>
-                                    <p class="text-sm text-gray-500 mt-1">Conta: {{ meta.contaVinculada }}</p>
+                                    <p class="text-sm text-gray-500 mt-1">Conta: {{ meta.account ? meta.account.name : 'Não vinculada' }}</p>
                                 </div>
                                 <button @click="handleDeleteMeta(meta.id)" class="text-gray-400 hover:text-red-500 hover:bg-red-50 p-2 rounded-lg transition-colors">
                                     <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
@@ -204,20 +209,31 @@ const formatCurrency = (value) => {
                             </div>
 
                             <div v-if="meta.status === 'concluida'">
+                                <div class="flex justify-between items-center mb-2">
+                                    <span class="text-sm text-gray-600">Acumulado: <b>{{ formatCurrency(meta.current_amount) }}</b></span>
+                                    <span class="text-sm text-green-700 font-bold bg-green-100 px-2 py-0.5 rounded-full">
+                                        {{ calcularProgressoReal(meta).toFixed(1) }}% Atingido
+                                    </span>
+                                </div>
                                 <p class="text-lg font-bold text-green-700 flex items-center gap-2">
-                                    {{ formatCurrency(meta.valorAlvo) }} - Meta Atingida! 🎉
+                                    Meta de {{ formatCurrency(meta.target_amount) }} alcançada! 🎉
                                 </p>
                             </div>
 
                             <div v-else>
                                 <div class="flex justify-between text-sm mb-2 font-medium">
-                                    <span class="text-gray-600">{{ formatCurrency(meta.valorAcumulado) }} de {{ formatCurrency(meta.valorAlvo) }}</span>
-                                    <span class="text-blue-600">{{ calcularProgresso(meta).toFixed(1) }}%</span>
+                                    <span class="text-gray-600">{{ formatCurrency(meta.current_amount) }} de {{ formatCurrency(meta.target_amount) }}</span>
+
+                                    <span class="text-blue-600">{{ calcularProgressoReal(meta).toFixed(1) }}%</span>
                                 </div>
+
                                 <div class="w-full bg-gray-100 rounded-full h-3 overflow-hidden mb-4">
-                                    <div class="bg-blue-600 h-full rounded-full transition-all duration-500" :style="{ width: `${calcularProgresso(meta)}%` }"></div>
+                                    <div class="bg-blue-600 h-full rounded-full transition-all duration-500"
+                                         :style="{ width: `${calcularLarguraBarra(meta)}%` }">
+                                    </div>
                                 </div>
-                                <button @click="showAddValueModal = meta.id" class="w-full py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg font-medium transition-colors flex items-center justify-center gap-2">
+
+                                <button @click="openAddValueModal(meta.id)" class="w-full py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg font-medium transition-colors flex items-center justify-center gap-2">
                                     <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="19" x2="12" y2="5"></line><polyline points="5 12 12 5 19 12"></polyline></svg>
                                     Adicionar Valor
                                 </button>
@@ -229,27 +245,24 @@ const formatCurrency = (value) => {
             </div>
         </div>
 
-        <div v-if="showAddValueModal" class="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4 backdrop-blur-sm">
-            <div class="bg-white rounded-xl shadow-xl w-full max-w-sm p-6 transform transition-all">
+        <div v-if="showAddValueModal" @click.self="closeModal" class="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4 backdrop-blur-sm cursor-pointer">
+            <div class="bg-white rounded-xl shadow-xl w-full max-w-sm p-6 transform transition-all cursor-default">
                 <h3 class="text-xl font-bold text-gray-900 mb-4">Adicionar Valor</h3>
 
-                <div class="mb-4">
-                    <label class="block text-sm font-medium text-gray-700 mb-1">Valor a Adicionar</label>
-                    <input v-model="valorAdicionar" type="number" step="0.01" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500" placeholder="0,00" autoFocus>
-                </div>
+                <form @submit.prevent="handleAddValue">
+                    <div class="mb-4">
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Valor a Adicionar</label>
+                        <input v-model="formAddValue.amount" type="number" step="0.01" required class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500" placeholder="0,00" autoFocus>
+                        <div v-if="formAddValue.errors.amount" class="text-red-500 text-xs mt-1">{{ formAddValue.errors.amount }}</div>
+                    </div>
 
-                <div class="mb-6">
-                    <label class="block text-sm font-medium text-gray-700 mb-1">Origem do Valor</label>
-                    <select v-model="origemSelecionada" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500">
-                        <option value="">Selecione...</option>
-                        <option v-for="conta in contas" :key="conta" :value="conta">{{ conta }}</option>
-                    </select>
-                </div>
-
-                <div class="flex gap-3">
-                    <button @click="closeModal" class="flex-1 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 font-medium transition-colors">Cancelar</button>
-                    <button @click="handleAddValue(showAddValueModal)" class="flex-1 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-medium transition-colors">Confirmar</button>
-                </div>
+                    <div class="flex gap-3 mt-6">
+                        <button type="button" @click="closeModal" class="flex-1 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 font-medium transition-colors">Cancelar</button>
+                        <button type="submit" :disabled="formAddValue.processing" class="flex-1 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-medium transition-colors">
+                            {{ formAddValue.processing ? 'Salvando...' : 'Confirmar' }}
+                        </button>
+                    </div>
+                </form>
             </div>
         </div>
 
