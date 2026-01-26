@@ -4,11 +4,13 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 
 class Transaction extends Model
 {
     protected $fillable = [
         'user_id',
+        'type',
         'category_id',
         'account_id',
         'payment_method_id',
@@ -24,4 +26,6 @@ class Transaction extends Model
     public function account(): BelongsTo { return $this->belongsTo(Account::class); }
 
     public function paymentMethod(): BelongsTo { return $this->belongsTo(PaymentMethod::class); }
+
+    public function tags(): BelongsToMany { return $this->belongsToMany(Tag::class); }
 }

@@ -15,7 +15,7 @@ const isActive = (route) => {
     <aside class="w-64 bg-[#0F172A] text-white flex flex-col justify-between h-full shadow-xl z-10 transition-all duration-300">
         <div>
             <div class="h-20 flex items-center px-6 border-b border-gray-700">
-                <span class="font-bold text-lg tracking-wide">Gestão Financeira</span>
+                <span class="font-bold text-lg tracking-wide">Meu Bolso</span>
             </div>
 
             <nav class="mt-6 px-4 space-y-2">

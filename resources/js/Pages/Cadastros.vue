@@ -1,10 +1,15 @@
 <script setup>
-import { ref, reactive } from 'vue';
-import { Head } from '@inertiajs/vue3';
+import { ref } from 'vue';
+import { Head, useForm, router } from '@inertiajs/vue3';
 import MainLayout from '@/Layouts/MainLayout.vue';
 
-defineProps({
-    auth: Object
+// Recebendo os dados do backend
+const props = defineProps({
+    auth: Object,
+    dbCategories: Array,
+    dbAccounts: Array,
+    dbPaymentMethods: Array,
+    dbTags: Array,
 });
 
 // --- Estado das Abas ---
@@ -18,88 +23,62 @@ const tabs = [
 ];
 
 // --- Lógica: Categorias ---
-const categories = ref([
-    { id: '1', name: 'Salário', type: 'entrada' },
-    { id: '2', name: 'Aluguel', type: 'saida' },
-    { id: '3', name: 'Combustível', type: 'saida' },
-]);
-const categoryForm = reactive({ name: '', type: 'entrada' });
+const categoryForm = useForm({ name: '', type: 'income' });
 
 const handleAddCategory = () => {
-    if (!categoryForm.name.trim()) return alert('Preencha o nome');
-
-    categories.value.push({
-        id: Date.now().toString(),
-        name: categoryForm.name,
-        type: categoryForm.type
+    categoryForm.post(route('categories.store'), {
+        onSuccess: () => categoryForm.reset(),
     });
-    categoryForm.name = '';
-    categoryForm.type = 'entrada';
 };
 
 const handleDeleteCategory = (id) => {
     if (confirm('Excluir categoria?')) {
-        categories.value = categories.value.filter(c => c.id !== id);
+        router.delete(route('categories.destroy', id));
     }
 };
 
 // --- Lógica: Formas de Pagamento ---
-const paymentMethods = ref([
-    { id: '1', name: 'Dinheiro' },
-    { id: '2', name: 'Cartão de Crédito' },
-    { id: '3', name: 'PIX' },
-]);
-const paymentForm = reactive({ name: '' });
+const paymentForm = useForm({ name: '' });
 
 const handleAddPayment = () => {
-    if (!paymentForm.name.trim()) return alert('Preencha o nome');
-    paymentMethods.value.push({ id: Date.now().toString(), name: paymentForm.name });
-    paymentForm.name = '';
+    paymentForm.post(route('payment-methods.store'), {
+        onSuccess: () => paymentForm.reset(),
+    });
 };
 
 const handleDeletePayment = (id) => {
     if (confirm('Excluir forma de pagamento?')) {
-        paymentMethods.value = paymentMethods.value.filter(p => p.id !== id);
+        router.delete(route('payment-methods.destroy', id));
     }
 };
 
 // --- Lógica: Contas ---
-const accounts = ref([
-    { id: '1', name: 'Conta Corrente' },
-    { id: '2', name: 'Carteira' },
-    { id: '3', name: 'Nubank' },
-]);
-const accountForm = reactive({ name: '' });
+const accountForm = useForm({ name: '' });
 
 const handleAddAccount = () => {
-    if (!accountForm.name.trim()) return alert('Preencha o nome');
-    accounts.value.push({ id: Date.now().toString(), name: accountForm.name });
-    accountForm.name = '';
+    accountForm.post(route('accounts.store'), {
+        onSuccess: () => accountForm.reset(),
+    });
 };
 
 const handleDeleteAccount = (id) => {
     if (confirm('Excluir conta?')) {
-        accounts.value = accounts.value.filter(a => a.id !== id);
+        router.delete(route('accounts.destroy', id));
     }
 };
 
 // --- Lógica: Tags ---
-const tags = ref([
-    { id: '1', name: 'Fixo' },
-    { id: '2', name: 'Lazer' },
-    { id: '3', name: 'Emergência' },
-]);
-const tagForm = reactive({ name: '' });
+const tagForm = useForm({ name: '' });
 
 const handleAddTag = () => {
-    if (!tagForm.name.trim()) return alert('Preencha o nome');
-    tags.value.push({ id: Date.now().toString(), name: tagForm.name });
-    tagForm.name = '';
+    tagForm.post(route('tags.store'), {
+        onSuccess: () => tagForm.reset(),
+    });
 };
 
 const handleDeleteTag = (id) => {
     if (confirm('Excluir tag?')) {
-        tags.value = tags.value.filter(t => t.id !== id);
+        router.delete(route('tags.destroy', id));
     }
 };
 </script>
@@ -149,17 +128,17 @@ const handleDeleteTag = (id) => {
                                 <label class="block text-sm font-medium text-gray-700 mb-2">Tipo</label>
                                 <div class="grid grid-cols-2 gap-3">
                                     <button type="button"
-                                        @click="categoryForm.type = 'entrada'"
+                                        @click="categoryForm.type = 'income'"
                                         class="py-2 px-3 rounded-lg border text-sm font-medium flex items-center justify-center gap-2 transition-all"
-                                        :class="categoryForm.type === 'entrada' ? 'bg-green-100 text-green-700 border-green-200' : 'bg-white border-gray-200 text-gray-600 hover:bg-gray-50'"
+                                        :class="categoryForm.type === 'income' ? 'bg-green-100 text-green-700 border-green-200' : 'bg-white border-gray-200 text-gray-600 hover:bg-gray-50'"
                                     >
                                         <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"></polyline><polyline points="17 6 23 6 23 12"></polyline></svg>
                                         Entrada
                                     </button>
                                     <button type="button"
-                                        @click="categoryForm.type = 'saida'"
+                                        @click="categoryForm.type = 'expense'"
                                         class="py-2 px-3 rounded-lg border text-sm font-medium flex items-center justify-center gap-2 transition-all"
-                                        :class="categoryForm.type === 'saida' ? 'bg-red-100 text-red-700 border-red-200' : 'bg-white border-gray-200 text-gray-600 hover:bg-gray-50'"
+                                        :class="categoryForm.type === 'expense' ? 'bg-red-100 text-red-700 border-red-200' : 'bg-white border-gray-200 text-gray-600 hover:bg-gray-50'"
                                     >
                                         <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 18 13.5 8.5 8.5 13.5 1 6"></polyline><polyline points="17 18 23 18 23 12"></polyline></svg>
                                         Saída
@@ -169,16 +148,21 @@ const handleDeleteTag = (id) => {
                             <div class="mb-4">
                                 <label class="block text-sm font-medium text-gray-700 mb-1">Nome</label>
                                 <input v-model="categoryForm.name" type="text" placeholder="Ex: Salário, Mercado..." class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500">
+                                <div v-if="categoryForm.errors.name" class="text-red-500 text-xs mt-1">{{ categoryForm.errors.name }}</div>
                             </div>
-                            <button type="submit" class="w-full bg-blue-600 text-white py-2 rounded-lg font-medium hover:bg-blue-700 transition-colors">Adicionar</button>
+                            <button type="submit" :disabled="categoryForm.processing" class="w-full bg-blue-600 text-white py-2 rounded-lg font-medium hover:bg-blue-700 transition-colors disabled:opacity-50">
+                                {{ categoryForm.processing ? 'Salvando...' : 'Adicionar' }}
+                            </button>
                         </form>
                     </div>
 
                     <div class="lg:col-span-2 space-y-3">
-                        <div v-for="cat in categories" :key="cat.id" class="flex items-center justify-between p-4 bg-white border border-gray-100 rounded-xl shadow-sm hover:border-gray-200 transition-colors">
+                        <div v-if="dbCategories.length === 0" class="text-gray-400 text-center py-8">Nenhuma categoria cadastrada.</div>
+
+                        <div v-for="cat in dbCategories" :key="cat.id" class="flex items-center justify-between p-4 bg-white border border-gray-100 rounded-xl shadow-sm hover:border-gray-200 transition-colors">
                             <div class="flex items-center gap-3">
-                                <div class="p-2 rounded-lg" :class="cat.type === 'entrada' ? 'bg-green-50 text-green-600' : 'bg-red-50 text-red-600'">
-                                    <svg v-if="cat.type === 'entrada'" xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"></polyline><polyline points="17 6 23 6 23 12"></polyline></svg>
+                                <div class="p-2 rounded-lg" :class="cat.type === 'income' ? 'bg-green-50 text-green-600' : 'bg-red-50 text-red-600'">
+                                    <svg v-if="cat.type === 'income'" xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"></polyline><polyline points="17 6 23 6 23 12"></polyline></svg>
                                     <svg v-else xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 18 13.5 8.5 8.5 13.5 1 6"></polyline><polyline points="17 18 23 18 23 12"></polyline></svg>
                                 </div>
                                 <span class="font-medium text-gray-800">{{ cat.name }}</span>
@@ -197,12 +181,17 @@ const handleDeleteTag = (id) => {
                             <div class="mb-4">
                                 <label class="block text-sm font-medium text-gray-700 mb-1">Nome</label>
                                 <input v-model="paymentForm.name" type="text" placeholder="Ex: PIX, Cartão..." class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500">
+                                <div v-if="paymentForm.errors.name" class="text-red-500 text-xs mt-1">{{ paymentForm.errors.name }}</div>
                             </div>
-                            <button type="submit" class="w-full bg-blue-600 text-white py-2 rounded-lg font-medium hover:bg-blue-700 transition-colors">Adicionar</button>
+                            <button type="submit" :disabled="paymentForm.processing" class="w-full bg-blue-600 text-white py-2 rounded-lg font-medium hover:bg-blue-700 transition-colors disabled:opacity-50">
+                                {{ paymentForm.processing ? 'Salvando...' : 'Adicionar' }}
+                            </button>
                         </form>
                     </div>
                     <div class="lg:col-span-2 space-y-3">
-                        <div v-for="method in paymentMethods" :key="method.id" class="flex items-center justify-between p-4 bg-white border border-gray-100 rounded-xl shadow-sm">
+                        <div v-if="dbPaymentMethods.length === 0" class="text-gray-400 text-center py-8">Nenhuma forma de pagamento cadastrada.</div>
+
+                        <div v-for="method in dbPaymentMethods" :key="method.id" class="flex items-center justify-between p-4 bg-white border border-gray-100 rounded-xl shadow-sm">
                             <div class="flex items-center gap-3">
                                 <div class="p-2 bg-blue-50 text-blue-600 rounded-lg">
                                     <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="1" y="4" width="22" height="16" rx="2" ry="2"></rect><line x1="1" y1="10" x2="23" y2="10"></line></svg>
@@ -223,12 +212,17 @@ const handleDeleteTag = (id) => {
                             <div class="mb-4">
                                 <label class="block text-sm font-medium text-gray-700 mb-1">Nome da Conta</label>
                                 <input v-model="accountForm.name" type="text" placeholder="Ex: Carteira, Banco X..." class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500">
+                                <div v-if="accountForm.errors.name" class="text-red-500 text-xs mt-1">{{ accountForm.errors.name }}</div>
                             </div>
-                            <button type="submit" class="w-full bg-blue-600 text-white py-2 rounded-lg font-medium hover:bg-blue-700 transition-colors">Adicionar</button>
+                            <button type="submit" :disabled="accountForm.processing" class="w-full bg-blue-600 text-white py-2 rounded-lg font-medium hover:bg-blue-700 transition-colors disabled:opacity-50">
+                                {{ accountForm.processing ? 'Salvando...' : 'Adicionar' }}
+                            </button>
                         </form>
                     </div>
                     <div class="lg:col-span-2 space-y-3">
-                        <div v-for="acc in accounts" :key="acc.id" class="flex items-center justify-between p-4 bg-white border border-gray-100 rounded-xl shadow-sm">
+                        <div v-if="dbAccounts.length === 0" class="text-gray-400 text-center py-8">Nenhuma conta cadastrada.</div>
+
+                        <div v-for="acc in dbAccounts" :key="acc.id" class="flex items-center justify-between p-4 bg-white border border-gray-100 rounded-xl shadow-sm">
                             <div class="flex items-center gap-3">
                                 <div class="p-2 bg-purple-50 text-purple-600 rounded-lg">
                                     <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect><line x1="12" y1="8" x2="12" y2="16"></line><line x1="8" y1="12" x2="16" y2="12"></line></svg>
@@ -249,13 +243,18 @@ const handleDeleteTag = (id) => {
                             <div class="mb-4">
                                 <label class="block text-sm font-medium text-gray-700 mb-1">Nome da Tag</label>
                                 <input v-model="tagForm.name" type="text" placeholder="Ex: Lazer, Fixo..." class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500">
+                                <div v-if="tagForm.errors.name" class="text-red-500 text-xs mt-1">{{ tagForm.errors.name }}</div>
                             </div>
-                            <button type="submit" class="w-full bg-blue-600 text-white py-2 rounded-lg font-medium hover:bg-blue-700 transition-colors">Adicionar</button>
+                            <button type="submit" :disabled="tagForm.processing" class="w-full bg-blue-600 text-white py-2 rounded-lg font-medium hover:bg-blue-700 transition-colors disabled:opacity-50">
+                                {{ tagForm.processing ? 'Salvando...' : 'Adicionar' }}
+                            </button>
                         </form>
                     </div>
                     <div class="lg:col-span-2">
+                        <div v-if="dbTags.length === 0" class="text-gray-400 text-center py-8">Nenhuma tag cadastrada.</div>
+
                         <div class="flex flex-wrap gap-2">
-                            <div v-for="tag in tags" :key="tag.id" class="flex items-center gap-2 px-4 py-2 bg-gray-50 border border-gray-200 rounded-full hover:bg-gray-100 transition-colors">
+                            <div v-for="tag in dbTags" :key="tag.id" class="flex items-center gap-2 px-4 py-2 bg-gray-50 border border-gray-200 rounded-full hover:bg-gray-100 transition-colors">
                                 <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-orange-500"><path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"></path><line x1="7" y1="7" x2="7.01" y2="7"></line></svg>
                                 <span class="font-medium text-gray-700">{{ tag.name }}</span>
                                 <button @click="handleDeleteTag(tag.id)" class="ml-1 text-gray-400 hover:text-red-500">

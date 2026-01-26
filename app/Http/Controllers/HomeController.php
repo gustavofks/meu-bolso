@@ -3,45 +3,66 @@
 namespace App\Http\Controllers;
 
 use App\Models\Transaction;
+use App\Models\Category;
+use App\Models\Account;
+use App\Models\PaymentMethod;
+use App\Models\Tag;
 use Inertia\Inertia;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Http\Request;
+use Carbon\Carbon;
 
 class HomeController extends Controller
 {
-    public function index()
+    public function index(Request $request)
     {
         $userId = Auth::id();
+        $period = $request->query('period', 'month');
 
-        // Busca entradas e saídas recentes
-        $entradas = Transaction::where('user_id', $userId)
-            ->whereHas('category', fn($q) => $q->where('type', 'income'))
-            ->with('category')
+        // Query Base com Filtros de Data
+        $query = Transaction::where('user_id', $userId);
+
+        if ($period === 'today') {
+            $query->whereDate('date', Carbon::today());
+        } else {
+            // Padrão: Mês atual
+            $query->whereMonth('date', Carbon::now()->month)
+                  ->whereYear('date', Carbon::now()->year);
+        }
+
+        // A query base é duplicada para calcular os totais e as listas
+        $baseQuery = clone $query;
+
+        // Totais do Período
+        $totalEntradas = (clone $baseQuery)->where('type', 'income')->sum('amount');
+        $totalSaidas = (clone $baseQuery)->where('type', 'expense')->sum('amount');
+
+        $saldoTotal = $totalEntradas - $totalSaidas;
+
+        $entradas = (clone $baseQuery)
+            ->where('type', 'income')
+            ->with(['category', 'tags'])
             ->latest('date')
-            ->take(5)
             ->get();
 
-        $saidas = Transaction::where('user_id', $userId)
-            ->whereHas('category', fn($q) => $q->where('type', 'expense'))
-            ->with('category')
+        $saidas = (clone $baseQuery)
+            ->where('type', 'expense')
+            ->with(['category', 'tags'])
             ->latest('date')
-            ->take(5)
             ->get();
 
-        // Totais para os cards
-        $totalEntradas = Transaction::where('user_id', $userId)
-            ->whereHas('category', fn($q) => $q->where('type', 'income'))
-            ->sum('amount');
-
-        $totalSaidas = Transaction::where('user_id', $userId)
-            ->whereHas('category', fn($q) => $q->where('type', 'expense'))
-            ->sum('amount');
-
+        // Dados Auxiliares para o Modal
         return Inertia::render('Home', [
-            'dbEntradas' => $entradas,
-            'dbSaidas' => $saidas,
-            'totalEntradas' => (float)$totalEntradas,
-            'totalSaidas' => (float)$totalSaidas,
-            'saldoTotal' => (float)($totalEntradas - $totalSaidas),
+            'dbEntradas'      => $entradas,
+            'dbSaidas'        => $saidas,
+            'totalEntradas'   => (float)$totalEntradas,
+            'totalSaidas'     => (float)$totalSaidas,
+            'saldoTotal'      => (float)$saldoTotal,
+            'categories'      => Category::where('user_id', $userId)->get(),
+            'accounts'        => Account::where('user_id', $userId)->get(),
+            'payment_methods' => PaymentMethod::where('user_id', $userId)->get(),
+            'tags'            => Tag::where('user_id', $userId)->get(),
+            'currentPeriod'   => $period
         ]);
     }
 }
