@@ -100,7 +100,7 @@ export default {
             <div class="border-b border-gray-200">
                 <nav class="-mb-px flex gap-8 overflow-x-auto">
                     <button
-                        v-for="tab in ['extrato', 'categoria', 'metas']"
+                        v-for="tab in ['extrato', 'categoria', 'metas', 'evolucao']"
                         :key="tab"
                         @click="changeTab(tab)"
                         class="py-4 px-1 border-b-2 font-medium text-sm transition-colors capitalize whitespace-nowrap"
@@ -108,7 +108,7 @@ export default {
                             ? 'border-blue-600 text-blue-600'
                             : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'"
                     >
-                        {{ tab === 'extrato' ? 'Extrato Detalhado' : (tab === 'categoria' ? 'Resumo por Categoria' : 'Histórico de Metas') }}
+                        {{ tab === 'extrato' ? 'Extrato Detalhado' : (tab === 'categoria' ? 'Resumo por Categoria' : (tab === 'metas' ? 'Histórico de Metas' : 'Evolução Mensal')) }}
                     </button>
                 </nav>
             </div>
@@ -208,6 +208,7 @@ export default {
                 </div>
             </div>
 
+            <!-- Relatório Extrato Detalhado -->
             <div v-if="form.tab === 'extrato'" class="overflow-x-auto">
                 <table class="w-full">
                     <thead class="bg-gray-50">
@@ -223,8 +224,8 @@ export default {
                         <tr v-for="item in reportData.data" :key="item.id" class="hover:bg-gray-50">
                             <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{{ formatDate(item.date) }}</td>
                             <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{{ item.description }}</td>
-                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{{ item.category?.name || 'S/ Cat' }}</td>
-                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{{ item.account?.name || 'S/ Conta' }}</td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{{ item.category?.name || '-' }}</td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{{ item.account?.name || '-' }}</td>
                             <td class="px-6 py-4 whitespace-nowrap text-sm font-bold text-right" :class="item.type === 'income' ? 'text-green-600' : 'text-red-600'">
                                 {{ formatCurrency(item.amount) }}
                             </td>
@@ -236,6 +237,7 @@ export default {
                 </table>
             </div>
 
+            <!-- Relatório Gastos por Categoria -->
             <div v-if="form.tab === 'categoria'" class="overflow-x-auto">
                 <table class="w-full">
                     <thead class="bg-gray-50">
@@ -264,25 +266,49 @@ export default {
                 </table>
             </div>
 
+            <!-- Relatório Histórico de Metas -->
             <div v-if="form.tab === 'metas'" class="overflow-x-auto">
                 <table class="w-full">
                     <thead class="bg-gray-50">
                         <tr>
-                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Data</th>
-                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Meta</th>
-                            <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Valor Depositado</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Data</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Meta</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Conta Origem</th>
+                            <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Valor Movimentado</th>
+                            <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Saldo Após</th>
                         </tr>
                     </thead>
                     <tbody class="bg-white divide-y divide-gray-200">
                         <tr v-for="item in reportData.data" :key="item.id" class="hover:bg-gray-50">
-                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{{ formatDate(item.date) }}</td>
-                            <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{{ item.meta_name || 'Meta' }}</td>
-                            <td class="px-6 py-4 whitespace-nowrap text-sm font-bold text-right text-blue-600">
-                                {{ formatCurrency(item.amount) }}
-                            </td>
+                            <td class="px-6 py-4 text-sm text-gray-900">{{ formatDate(item.date) }}</td>
+                            <td class="px-6 py-4 text-sm font-medium text-gray-900">{{ item.meta_name }}</td>
+                            <td class="px-6 py-4 text-sm text-gray-500">{{ item.account_name || 'N/A' }}</td>
+                            <td class="px-6 py-4 text-sm font-bold text-right text-green-600">+ {{ formatCurrency(item.amount) }}</td>
+                            <td class="px-6 py-4 text-sm text-right text-gray-700">{{ formatCurrency(item.balance_after) }}</td>
                         </tr>
-                        <tr v-if="!reportData.data || !reportData.data.length">
-                            <td colspan="3" class="px-6 py-8 text-center text-gray-500">Nenhum registro de meta neste período.</td>
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- Relatório Evolução Mensal -->
+            <div v-if="form.tab === 'evolucao'" class="overflow-x-auto">
+                <table class="w-full">
+                    <thead class="bg-gray-50">
+                        <tr>
+                            <th class="px-6 py-3 text-left text-xs font-medium uppercase">Mês/Ano</th>
+                            <th class="px-6 py-3 text-right text-xs font-medium uppercase text-green-600">Entradas</th>
+                            <th class="px-6 py-3 text-right text-xs font-medium uppercase text-red-600">Saídas</th>
+                            <th class="px-6 py-3 text-right text-xs font-medium uppercase text-gray-500 ">Resultado</th>
+                        </tr>
+                    </thead>
+                    <tbody class="bg-white divide-y divide-gray-200">
+                        <tr v-for="(item, index) in reportData" :key="index" class="hover:bg-gray-50">
+                            <td class="px-6 py-4 text-sm font-medium text-gray-900 capitalize">{{ item.mes_ano }}</td>
+                            <td class="px-6 py-4 text-sm text-right text-green-600">{{ formatCurrency(item.entradas) }}</td>
+                            <td class="px-6 py-4 text-sm text-right text-red-600">{{ formatCurrency(item.saidas) }}</td>
+                            <td class="px-6 py-4 text-sm text-right font-bold" :class="item.resultado >= 0 ? 'text-blue-600' : 'text-red-600'">
+                                {{ formatCurrency(item.resultado) }}
+                            </td>
                         </tr>
                     </tbody>
                 </table>

@@ -23,35 +23,38 @@ class ReportController extends Controller
     {
         $filters = $request->all();
 
-        // Define datas padrão se não vierem
+        // Datas padrão: início do ano até hoje ou mês atual
         if (!isset($filters['date_from'])) {
             $filters['date_from'] = Carbon::now()->startOfMonth()->format('Y-m-d');
             $filters['date_to'] = Carbon::now()->endOfMonth()->format('Y-m-d');
         }
 
-        // 1. Constrói a query base com os filtros
         $this->repository->buildQuery($filters, Auth::id());
 
-        // 2. Busca dados dependendo da Tab selecionada
         $activeTab = $request->input('tab', 'extrato');
-
         $reportData = null;
         $summary = $this->repository->getSummaryCards();
 
-        if ($activeTab === 'extrato') {
-            $reportData = $this->repository->getStatement();
-        } elseif ($activeTab === 'categoria') {
-            $reportData = $this->repository->getByCategory();
-        } elseif ($activeTab === 'metas') {
-            $reportData = $this->repository->getGoalRegisters();
+        switch ($activeTab) {
+            case 'extrato':
+                $reportData = $this->repository->getStatement();
+                break;
+            case 'categoria':
+                $reportData = $this->repository->getByCategory();
+                break;
+            case 'metas':
+                $reportData = $this->repository->getGoalHistory();
+                break;
+            case 'evolucao':
+                $reportData = $this->repository->getMonthlyEvolution();
+                break;
         }
 
         return Inertia::render('Relatorios', [
-            'filters' => $request->all(),
+            'filters' => $filters,
             'activeTab' => $activeTab,
             'reportData' => $reportData,
             'summary' => $summary,
-            // Dropdowns para os filtros
             'categories' => Category::where('user_id', Auth::id())->get(),
             'accounts' => Account::where('user_id', Auth::id())->get(),
         ]);
