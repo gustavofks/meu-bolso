@@ -57,59 +57,32 @@ class ReportRepository
         $income = (clone $this->query)->where('type', 'income')->sum('amount');
         $expense = (clone $this->query)->where('type', 'expense')->sum('amount');
 
-        $periodResult = $income - $expense;
-
-        $finalBalance = $previousBalance + $periodResult;
-
         return [
             'previous_balance' => $previousBalance,
             'income' => $income,
             'expense' => $expense,
-            'balance' => $finalBalance
+            'balance' => $previousBalance + ($income - $expense)
         ];
     }
 
-    // Relatório Extrato Detalhado
-    public function getStatement()
+    // Lógica para query reutilizável
+
+    // Query Extrato Detalhado
+    public function getStatementQuery()
     {
         $select = "
             transactions.*,
             SUM(CASE WHEN type = 'income' THEN amount ELSE -amount END)
             OVER (ORDER BY date ASC, id ASC) as running_balance
         ";
-
         return (clone $this->query)
             ->selectRaw($select)
-            ->orderBy('date', 'desc') // Ordenação visual
-            ->orderBy('id', 'desc')
-            ->paginate(10)
-            ->withQueryString();
+            ->orderBy('date', 'desc')
+            ->orderBy('id', 'desc');
     }
 
-    // Relatório Gastos por Categoria
-    public function getByCategory()
-    {
-        $totalExpenses = (clone $this->query)->where('type', 'expense')->sum('amount');
-
-        return (clone $this->query)
-            ->where('type', 'expense')
-            ->selectRaw('category_id, COUNT(*) as qtd, SUM(amount) as total')
-            ->groupBy('category_id')
-            ->with('category')
-            ->orderByDesc('total')
-            ->get()
-            ->map(function ($item) use ($totalExpenses) {
-                return [
-                    'name' => $item->category ? $item->category->name : 'Sem Categoria',
-                    'total' => (float)$item->total,
-                    'qtd' => $item->qtd,
-                    'percent' => $totalExpenses > 0 ? round(($item->total / $totalExpenses) * 100, 1) : 0
-                ];
-            });
-    }
-
-    // Relatório Histórico de Metas
-    public function getGoalHistory()
+    // Query Histórico de Metas
+    public function getGoalHistoryQuery()
     {
         $q = GoalTransaction::query()
             ->join('goals', 'goal_transactions.goal_id', '=', 'goals.id')
@@ -125,13 +98,34 @@ class ReportRepository
             $q->whereBetween('goal_transactions.date', [$this->filters['date_from'], $this->filters['date_to']]);
         }
 
-        return $q->latest('goal_transactions.date')
-            ->paginate(10)
-            ->withQueryString();
+        return $q->latest('goal_transactions.date');
     }
 
-    // Relatório Evolução Mensal
-    public function getMonthlyEvolution()
+    // Coleção de Categorias
+    public function getByCategoryCollection()
+    {
+        $totalExpenses = (clone $this->query)->where('type', 'expense')->sum('amount');
+
+        return (clone $this->query)
+            ->where('type', 'expense')
+            ->selectRaw('category_id, COUNT(*) as qtd, SUM(amount) as total')
+            ->groupBy('category_id')
+            ->with('category')
+            ->orderByDesc('total')
+            ->get()
+            ->map(function ($item) use ($totalExpenses) {
+                return (object) [ // Convertendo para objeto para padronizar acesso
+                    'name' => $item->category ? $item->category->name : 'Sem Categoria',
+                    'type' => $item->type,
+                    'total' => (float)$item->total,
+                    'qtd' => $item->qtd,
+                    'percent' => $totalExpenses > 0 ? round(($item->total / $totalExpenses) * 100, 1) : 0
+                ];
+            });
+    }
+
+    // Coleção de Evolução
+    public function getMonthlyEvolutionCollection()
     {
         return (clone $this->query)
             ->selectRaw("
@@ -144,7 +138,7 @@ class ReportRepository
             ->orderBy('sort_date')
             ->get()
             ->map(function ($item) {
-                return [
+                return (object) [
                     'mes_ano' => $item->mes_ano,
                     'entradas' => (float)$item->entradas,
                     'saidas' => (float)$item->saidas,
@@ -153,7 +147,28 @@ class ReportRepository
             });
     }
 
-    public function getAllForExport() {
-        return (clone $this->query)->latest('date')->get();
+    // Paginação
+    public function getStatementPaginated() {
+        return $this->getStatementQuery()->paginate(10)->withQueryString();
+    }
+
+    public function getGoalHistoryPaginated() {
+        return $this->getGoalHistoryQuery()->paginate(10)->withQueryString();
+    }
+
+    // Export
+    public function getDataForExport($tab)
+    {
+        switch ($tab) {
+            case 'categoria':
+                return $this->getByCategoryCollection();
+            case 'metas':
+                return $this->getGoalHistoryQuery()->get();
+            case 'evolucao':
+                return $this->getMonthlyEvolutionCollection();
+            case 'extrato':
+            default:
+                return $this->getStatementQuery()->get();
+        }
     }
 }

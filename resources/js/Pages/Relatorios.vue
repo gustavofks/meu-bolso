@@ -2,7 +2,6 @@
 import { Head, router, Link } from '@inertiajs/vue3';
 import MainLayout from '@/Layouts/MainLayout.vue';
 
-// Função utilitária de debounce (fora do componente para ser pura)
 function debounce(fn, delay) {
     let timeoutID = null;
     return function (...args) {
@@ -23,7 +22,7 @@ export default {
         auth: Object,
         filters: Object,
         activeTab: String,
-        reportData: [Object, Array], // Pode ser paginado ou lista
+        reportData: [Object, Array],
         summary: Object,
         categories: Array,
         accounts: Array,
@@ -42,11 +41,9 @@ export default {
         };
     },
     created() {
-        // Cria a versão com delay da função de atualização
         this.debouncedUpdate = debounce(this.updateReport, 500);
     },
     watch: {
-        // Observa qualquer mudança no objeto form
         form: {
             handler() {
                 this.debouncedUpdate();
@@ -64,11 +61,15 @@ export default {
         },
         changeTab(tabName) {
             this.form.tab = tabName;
-            // O watch disparará o updateReport automaticamente
         },
-        handleExport() {
-            const query = new URLSearchParams(this.form).toString();
-            window.open(route('reports.export') + '?' + query, '_blank');
+        handleExport(format) {
+            const params = new URLSearchParams({
+                ...this.form,
+                format: format
+            }).toString();
+
+            window.open(route('reports.export') + '?' + params, '_blank');
+
             this.showExportDropdown = false;
         },
         formatCurrency(value) {
@@ -79,7 +80,6 @@ export default {
         },
         formatDate(dateString) {
             if (!dateString) return '-';
-            // Garante que a data seja interpretada corretamente independente do formato
             const date = new Date(dateString);
             return date.toLocaleDateString('pt-BR', { timeZone: 'UTC' });
         }
@@ -193,18 +193,46 @@ export default {
 
             <div class="bg-gray-50 p-4 flex items-center justify-between border-b border-gray-200">
                 <h3 class="text-lg font-bold text-gray-900 capitalize">
-                    {{ form.tab === 'extrato' ? 'Transações' : (form.tab === 'categoria' ? 'Agrupado por Categoria' : 'Histórico de Metas') }}
+                    {{ form.tab === 'extrato' ? 'Transações' : (form.tab === 'categoria' ? 'Agrupado por Categoria' : (form.tab === 'metas' ? 'Histórico de Metas' : 'Agrupado por mês'))}}
                 </h3>
                 <div class="relative">
-                    <button @click="showExportDropdown = !showExportDropdown" class="flex items-center gap-2 bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors text-sm">
+                    <button
+                        @click="showExportDropdown = !showExportDropdown"
+                        class="flex items-center gap-2 bg-white border border-gray-300 text-gray-700 px-4 py-2 rounded-lg hover:bg-gray-50 transition-colors text-sm font-medium shadow-sm"
+                    >
                         <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
-                        Exportar CSV
+                        Exportar
+                        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="ml-1"><polyline points="6 9 12 15 18 9"></polyline></svg>
                     </button>
-                    <div v-if="showExportDropdown" class="absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-lg border border-gray-200 z-10">
-                        <button @click="handleExport" class="block w-full text-left px-4 py-2 hover:bg-gray-100 text-sm text-gray-700">
-                            Baixar Relatório Atual
+
+                    <div v-if="showExportDropdown" class="absolute right-0 mt-2 w-56 bg-white rounded-lg shadow-xl border border-gray-100 z-20 overflow-hidden">
+
+                        <button
+                            @click="handleExport('xlsx')"
+                            class="w-full text-left px-4 py-3 hover:bg-green-50 flex items-center gap-3 transition-colors border-b border-gray-50"
+                        >
+                            <div class="bg-green-100 p-1.5 rounded text-green-700">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="8" y1="13" x2="16" y2="13"></line><line x1="8" y1="17" x2="16" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg>
+                            </div>
+                            <div>
+                                <p class="text-sm font-bold text-gray-800">Excel (.xlsx)</p>
+                            </div>
+                        </button>
+
+                        <button
+                            @click="handleExport('csv')"
+                            class="w-full text-left px-4 py-3 hover:bg-blue-50 flex items-center gap-3 transition-colors"
+                        >
+                            <div class="bg-blue-100 p-1.5 rounded text-blue-700">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="12" y1="18" x2="12" y2="12"></line><line x1="9" y1="15" x2="15" y2="15"></line></svg>
+                            </div>
+                            <div>
+                                <p class="text-sm font-bold text-gray-800">CSV (.csv)</p>
+                            </div>
                         </button>
                     </div>
+
+                    <div v-if="showExportDropdown" @click="showExportDropdown = false" class="fixed inset-0 z-10 cursor-default"></div>
                 </div>
             </div>
 
@@ -295,18 +323,18 @@ export default {
                 <table class="w-full">
                     <thead class="bg-gray-50">
                         <tr>
-                            <th class="px-6 py-3 text-left text-xs font-medium uppercase">Mês/Ano</th>
-                            <th class="px-6 py-3 text-right text-xs font-medium uppercase text-green-600">Entradas</th>
-                            <th class="px-6 py-3 text-right text-xs font-medium uppercase text-red-600">Saídas</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium uppercase text-gray-500">Mês/Ano</th>
+                            <th class="px-6 py-3 text-right text-xs font-medium uppercase text-gray-500">Entradas</th>
+                            <th class="px-6 py-3 text-right text-xs font-medium uppercase text-gray-500">Saídas</th>
                             <th class="px-6 py-3 text-right text-xs font-medium uppercase text-gray-500 ">Resultado</th>
                         </tr>
                     </thead>
                     <tbody class="bg-white divide-y divide-gray-200">
                         <tr v-for="(item, index) in reportData" :key="index" class="hover:bg-gray-50">
-                            <td class="px-6 py-4 text-sm font-medium text-gray-900 capitalize">{{ item.mes_ano }}</td>
+                            <td class="px-6 py-4 text-sm font-medium text-gray-900">{{ item.mes_ano }}</td>
                             <td class="px-6 py-4 text-sm text-right text-green-600">{{ formatCurrency(item.entradas) }}</td>
                             <td class="px-6 py-4 text-sm text-right text-red-600">{{ formatCurrency(item.saidas) }}</td>
-                            <td class="px-6 py-4 text-sm text-right font-bold" :class="item.resultado >= 0 ? 'text-blue-600' : 'text-red-600'">
+                            <td class="px-6 py-4 text-sm text-right text-gray-900" :class="item.resultado >= 0 ? 'text-blue-600' : 'text-red-600'">
                                 {{ formatCurrency(item.resultado) }}
                             </td>
                         </tr>
