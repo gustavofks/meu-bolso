@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\Goal;
+use App\Models\GoalTransaction;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 
@@ -31,12 +32,18 @@ class GoalController extends Controller
     public function update(Request $request, Goal $goal)
     {
         if ($goal->user_id !== Auth::id()) abort(403);
+        $request->validate(['amount' => 'required|numeric|min:0.01']);
 
-        $request->validate([
-            'amount' => 'required|numeric|min:0.01'
-        ]);
-
+        // Atualiza o saldo atual da meta
         $goal->increment('current_amount', $request->amount);
+
+        // Registra o histórico
+        GoalTransaction::create([
+            'goal_id' => $goal->id,
+            'amount' => $request->amount,
+            'balance_after' => $goal->current_amount,
+            'date' => now()
+        ]);
 
         if ($goal->current_amount >= $goal->target_amount) {
             $goal->update(['status' => 'concluida']);

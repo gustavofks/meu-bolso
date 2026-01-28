@@ -15,16 +15,18 @@ export default {
     data() {
         return {
             activeTab: 'em_andamento',
-            showAddValueModal: null, // Guarda o ID da meta para abrir o modal
+            showAddValueModal: null,
+            showConfirmExceedModal: false,
 
-            // Formulário de Criação
+            metaSelecionada: null,
+            valorExcedenteCalculado: 0,
+
             formCreate: useForm({
                 name: '',
                 target_amount: '',
                 account_id: ''
             }),
 
-            // Formulário de Adicionar Valor
             formAddValue: useForm({
                 amount: ''
             })
@@ -45,47 +47,82 @@ export default {
         }
     },
     methods: {
-        // --- Ações de CRUD ---
         handleAddMeta() {
             this.formCreate.post(route('goals.store'), {
                 onSuccess: () => this.formCreate.reset(),
             });
         },
+
         handleDeleteMeta(id) {
             if (confirm('Deseja realmente excluir esta meta?')) {
                 router.delete(route('goals.destroy', id));
             }
         },
+
         handleAddValue() {
-            // Envia o valor para somar na meta
-            this.formAddValue.put(route('goals.update', this.showAddValueModal), {
-                onSuccess: () => {
-                    this.closeModal();
-                }
-            });
+        	const meta = this.metaSelecionada;
+        	const valorAdicionar = Number(this.formAddValue.amount);
+        	const atual = Number(meta.current_amount);
+        	const alvo = Number(meta.target_amount);
+
+        	const novoTotal = atual + valorAdicionar;
+
+        	if (novoTotal > alvo) {
+        		this.valorExcedenteCalculado = alvo - atual;
+        		this.showConfirmExceedModal = true;
+        		return;
+        	}
+
+        	this.enviarValor(valorAdicionar);
         },
 
-        // --- Controle do Modal ---
-        openAddValueModal(metaId) {
-            this.showAddValueModal = metaId;
+        enviarValor(valor) {
+        	this.formAddValue.amount = valor;
+
+        	this.formAddValue.put(route('goals.update', this.metaSelecionada.id), {
+        		onSuccess: () => {
+        			this.closeAllModals();
+        		}
+        	});
+        },
+
+        confirmarAdicionarRestante() {
+        	this.enviarValor(this.valorExcedenteCalculado);
+        },
+
+        confirmarAdicionarTotal() {
+        	this.enviarValor(this.formAddValue.amount);
+        },
+
+        openAddValueModal(meta) {
+            this.metaSelecionada = meta
+            this.showAddValueModal = meta.id;
             this.formAddValue.reset();
         },
+
         closeModal() {
             this.showAddValueModal = null;
             this.formAddValue.reset();
         },
 
-        // --- Helpers de Formatação ---
+        closeAllModals() {
+        	this.showAddValueModal = null;
+        	this.showConfirmExceedModal = false;
+        	this.metaSelecionada = null;
+        	this.formAddValue.reset();
+        },
 
-        // Calcula a porcentagem REAL (pode passar de 100%)
         calcularProgressoReal(meta) {
             const atual = parseFloat(meta.current_amount);
             const alvo = parseFloat(meta.target_amount);
-            if (alvo <= 0) return 0;
-            return (atual / alvo) * 100, 100;
+
+            if (!alvo || alvo <= 0) {
+        		return 0;
+        	}
+
+        	return (atual / alvo) * 100;
         },
 
-        // Calcula a largura da barra (Trava em 100% para não quebrar o CSS)
         calcularLarguraBarra(meta) {
             return Math.min(this.calcularProgressoReal(meta), 100);
         },
@@ -209,14 +246,8 @@ export default {
                             </div>
 
                             <div v-if="meta.status === 'concluida'">
-                                <div class="flex justify-between items-center mb-2">
-                                    <span class="text-sm text-gray-600">Acumulado: <b>{{ formatCurrency(meta.current_amount) }}</b></span>
-                                    <span class="text-sm text-green-700 font-bold bg-green-100 px-2 py-0.5 rounded-full">
-                                        {{ calcularProgressoReal(meta).toFixed(1) }}% Atingido
-                                    </span>
-                                </div>
                                 <p class="text-lg font-bold text-green-700 flex items-center gap-2">
-                                    Meta de {{ formatCurrency(meta.target_amount) }} alcançada! 🎉
+                                    Meta de {{ formatCurrency(meta.target_amount) }} alcançada!
                                 </p>
                             </div>
 
@@ -233,13 +264,12 @@ export default {
                                     </div>
                                 </div>
 
-                                <button @click="openAddValueModal(meta.id)" class="w-full py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg font-medium transition-colors flex items-center justify-center gap-2">
+                                <button @click="openAddValueModal(meta)" class="w-full py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg font-medium transition-colors flex items-center justify-center gap-2">
                                     <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="19" x2="12" y2="5"></line><polyline points="5 12 12 5 19 12"></polyline></svg>
                                     Adicionar Valor
                                 </button>
                             </div>
                         </div>
-
                     </div>
                 </div>
             </div>
@@ -266,5 +296,45 @@ export default {
             </div>
         </div>
 
+        <div v-if="showConfirmExceedModal" class="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4 backdrop-blur-sm">
+        	<div class="bg-white rounded-xl shadow-xl w-full max-w-md p-6">
+        		<h3 class="text-lg font-bold text-gray-900 mb-3">
+        			Valor excede a meta
+        		</h3>
+
+        		<p class="text-gray-600 mb-4">
+        			O valor informado ultrapassa o total da meta.
+        			O que você deseja fazer?
+        		</p>
+
+        		<div class="bg-gray-50 rounded-lg p-4 text-sm mb-6">
+        			<p><b>Restante para completar:</b> {{ formatCurrency(valorExcedenteCalculado) }}</p>
+        			<p><b>Valor informado:</b> {{ formatCurrency(formAddValue.amount) }}</p>
+        		</div>
+
+        		<div class="flex gap-3">
+        			<button
+        				@click="confirmarAdicionarRestante"
+        				class="flex-1 bg-green-600 text-white py-2 rounded-lg hover:bg-green-700 font-medium"
+        			>
+        				Adicionar apenas o restante
+        			</button>
+
+        			<button
+        				@click="confirmarAdicionarTotal"
+        				class="flex-1 bg-blue-600 text-white py-2 rounded-lg hover:bg-blue-700 font-medium"
+        			>
+        				Adicionar valor total
+        			</button>
+        		</div>
+
+        		<button
+        			@click="showConfirmExceedModal = false"
+        			class="w-full mt-4 text-sm text-gray-500 hover:text-gray-700"
+        		>
+        			Cancelar
+        		</button>
+        	</div>
+        </div>
     </MainLayout>
 </template>
