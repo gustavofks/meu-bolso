@@ -9,6 +9,7 @@ use App\Http\Controllers\AccountController;
 use App\Http\Controllers\PaymentMethodController;
 use App\Http\Controllers\TagController;
 use App\Http\Controllers\TransactionController;
+use App\Http\Controllers\ReportController;
 
 // Grupo Principal: Requer Autenticação e Verificação
 Route::middleware(['auth', 'verified'])->group(function () {
@@ -58,6 +59,12 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::post('/', [TransactionController::class, 'store'])->name('store');
         Route::put('/{transaction}', [TransactionController::class, 'update'])->name('update');
         Route::delete('/{transaction}', [TransactionController::class, 'destroy'])->name('destroy');
+    });
+
+    // --- Módulo: Relatórios ---
+    Route::group(['prefix' => 'reports', 'as' => 'reports.'], function () {
+    	Route::get('/', [ReportController::class, 'index'])->name('index');
+    	Route::get('/export', [ReportController::class, 'export'])->name('export');
     });
 
 });
